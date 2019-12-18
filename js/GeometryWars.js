@@ -47,7 +47,7 @@ GeometryWars = (function() {
     initLighting();
     initGUI();
     renderScene();
-    setTimeout(titleSequence, 1000);
+    setTimeout(titleSequence, 10);
   }
   function setListeners() {
     window.addEventListener('resize', clientResize, false);
@@ -131,6 +131,7 @@ GeometryWars = (function() {
     raycaster = new THREE.Raycaster();
     mouse = new THREE.Vector2();
   }
+  let gridHelper;
   function initLighting() {
     lights = {};
     let ambientLight = new THREE.AmbientLight(0xffffff, 0.1);
@@ -141,12 +142,29 @@ GeometryWars = (function() {
     scene.add(hemisphereLight);
     var size = 100;
     var divisions = 100;
-    var gridHelper = new THREE.GridHelper( size, divisions );
+    gridHelper = new THREE.GridHelper( size, divisions );
     gridHelper.rotation.x = Math.PI / 2;
     gridHelper.position.z = -2;
     gridHelper.material.transparent = true;
     gridHelper.material.opacity = 0.2;
     scene.add(gridHelper);
+    let cameraPosition = {
+      x: 0,
+      y: 0,
+      z: 20
+    };
+    let tween = new TWEEN.Tween(cameraPosition)
+      .to({
+        x: 0,
+        y: -10,
+        z: 14
+      }, 10 * 1000)
+      .easing(TWEEN.Easing.Cubic.InOut)
+      .onUpdate(() => {
+        camera.position.set(cameraPosition.x, cameraPosition.y, cameraPosition.z);
+        camera.lookAt(new THREE.Vector3(0, 0, 0));
+      })
+      .start();
   }
   function titleSequence() {
     setTimeout(function() {
@@ -168,45 +186,47 @@ GeometryWars = (function() {
     }, 1000);
   }
 
-  setInterval(function() {
-    // return;
-    scene.traverse(child => {
-      if (child.type !== 'Object3D') return;
-      let desiredScale = 1 + ((Math.random() * 0.4) - 0.2);
-      let scaleReference = {
-        x: child.scale.x,
-        y: child.scale.y,
-        z: child.scale.z
-      };
-      let scalingTween = new TWEEN.Tween(scaleReference)
-        .to({
-          x: desiredScale,
-          y: desiredScale,
-          z: desiredScale
-        }, 1000)
-        .easing(TWEEN.Easing.Quadratic.InOut)
-        .onUpdate(() => {
-          child.scale.set(scaleReference.x, scaleReference.y, scaleReference.z);
-        })
-        .start();
-      let rotationReference = {
-        x: child.rotation.x,
-        y: child.rotation.y,
-        z: child.rotation.z
-      };
-      let rotationTween = new TWEEN.Tween(rotationReference)
-        .to({
-          x: Math.random() * Math.PI,
-          y: Math.random() * Math.PI,
-          z: Math.random() * Math.PI
-        }, 1000)
-        .easing(TWEEN.Easing.Quadratic.InOut)
-        .onUpdate(() => {
-          child.rotation.set(rotationReference.x, rotationReference.y, rotationReference.z);
-        })
-        .start();
-    });
-  }, 1000);
+  function startAnimationSequence() {
+    setInterval(function() {
+      // return;
+      scene.traverse(child => {
+        if (child.type !== 'Object3D') return;
+        let desiredScale = 1 + ((Math.random() * 0.4) - 0.2);
+        let scaleReference = {
+          x: child.scale.x,
+          y: child.scale.y,
+          z: child.scale.z
+        };
+        let scalingTween = new TWEEN.Tween(scaleReference)
+          .to({
+            x: desiredScale,
+            y: desiredScale,
+            z: desiredScale
+          }, 1000)
+          .easing(TWEEN.Easing.Quadratic.InOut)
+          .onUpdate(() => {
+            child.scale.set(scaleReference.x, scaleReference.y, scaleReference.z);
+          })
+          .start();
+        let rotationReference = {
+          x: child.rotation.x,
+          y: child.rotation.y,
+          z: child.rotation.z
+        };
+        let rotationTween = new TWEEN.Tween(rotationReference)
+          .to({
+            x: Math.random() * Math.PI,
+            y: Math.random() * Math.PI,
+            z: Math.random() * Math.PI
+          }, 1000)
+          .easing(TWEEN.Easing.Quadratic.InOut)
+          .onUpdate(() => {
+            child.rotation.set(rotationReference.x, rotationReference.y, rotationReference.z);
+          })
+          .start();
+      });
+    }, 1000);
+  }
 
   function updateRotationDampening(object) {
     if (!object.userData.desiredRotation) return;
@@ -218,6 +238,8 @@ GeometryWars = (function() {
   }
 
   function renderScene(time) {
+    kd.tick();
+    updateControlInputs();
     TWEEN.update(time);
     scene.traverse(updateRotationDampening);
     updateCamera();
@@ -232,6 +254,22 @@ GeometryWars = (function() {
   }
   function updateCamera() {
     camera.updateProjectionMatrix();
+  }
+  function updateControlInputs() {
+    let movingLeft = kd.A.isDown();
+    let movingRight = kd.D.isDown();
+    let movingUp = kd.W.isDown();
+    let movingDown = kd.S.isDown();
+    if (movingLeft && !movingRight) {
+      // left
+    } else if (movingRight) {
+      // right
+    }
+    if (movingUp && !movingDown) {
+      // up
+    } else if (movingDown) {
+      // down
+    }
   }
 
   function darkenNonBloomed(obj) {
@@ -265,12 +303,14 @@ GeometryWars = (function() {
   init();
 
   function createShapes() {
+    let introDuration = 4 * 1000;
+    let introEasing = TWEEN.Easing.Cubic.Out;
     GeometryWars.Shapes.Tetrahedron.create().then(shapeObject => {
       shapeObject.position.set(-8, 2, 0);
       scene.add(shapeObject);
       let tween = new TWEEN.Tween(shapeObject.userData.tweenTarget.scale)
-        .to({ x: 1, y: 1, z: 1 }, 4000)
-        .easing(TWEEN.Easing.Cubic.InOut)
+        .to({ x: 1, y: 1, z: 1 }, introDuration)
+        .easing(introEasing)
         .onUpdate(() => { shapeObject.scale.set(shapeObject.userData.tweenTarget.scale.x, shapeObject.userData.tweenTarget.scale.y, shapeObject.userData.tweenTarget.scale.z); })
         .start();
       characters.add(shapeObject);
@@ -279,8 +319,8 @@ GeometryWars = (function() {
       shapeObject.position.set(-4, 2, 0);
       scene.add(shapeObject);
       let tween = new TWEEN.Tween(shapeObject.userData.tweenTarget.scale)
-        .to({ x: 1, y: 1, z: 1 }, 4000)
-        .easing(TWEEN.Easing.Cubic.InOut)
+        .to({ x: 1, y: 1, z: 1 }, introDuration)
+        .easing(introEasing)
         .onUpdate(() => { shapeObject.scale.set(shapeObject.userData.tweenTarget.scale.x, shapeObject.userData.tweenTarget.scale.y, shapeObject.userData.tweenTarget.scale.z); })
         .start();
       characters.add(shapeObject);
@@ -289,8 +329,8 @@ GeometryWars = (function() {
       shapeObject.position.set(0, 2, 0);
       scene.add(shapeObject);
       let tween = new TWEEN.Tween(shapeObject.userData.tweenTarget.scale)
-        .to({ x: 1, y: 1, z: 1 }, 4000)
-        .easing(TWEEN.Easing.Cubic.InOut)
+        .to({ x: 1, y: 1, z: 1 }, introDuration)
+        .easing(introEasing)
         .onUpdate(() => { shapeObject.scale.set(shapeObject.userData.tweenTarget.scale.x, shapeObject.userData.tweenTarget.scale.y, shapeObject.userData.tweenTarget.scale.z); })
         .start();
       characters.add(shapeObject);
@@ -299,8 +339,8 @@ GeometryWars = (function() {
       shapeObject.position.set(4, 2, 0);
       scene.add(shapeObject);
       let tween = new TWEEN.Tween(shapeObject.userData.tweenTarget.scale)
-        .to({ x: 1, y: 1, z: 1 }, 4000)
-        .easing(TWEEN.Easing.Cubic.InOut)
+        .to({ x: 1, y: 1, z: 1 }, introDuration)
+        .easing(introEasing)
         .onUpdate(() => { shapeObject.scale.set(shapeObject.userData.tweenTarget.scale.x, shapeObject.userData.tweenTarget.scale.y, shapeObject.userData.tweenTarget.scale.z); })
         .start();
       characters.add(shapeObject);
@@ -309,12 +349,13 @@ GeometryWars = (function() {
       shapeObject.position.set(8, 2, 0);
       scene.add(shapeObject);
       let tween = new TWEEN.Tween(shapeObject.userData.tweenTarget.scale)
-        .to({ x: 1, y: 1, z: 1 }, 4000)
-        .easing(TWEEN.Easing.Cubic.InOut)
+        .to({ x: 1, y: 1, z: 1 }, introDuration)
+        .easing(introEasing)
         .onUpdate(() => { shapeObject.scale.set(shapeObject.userData.tweenTarget.scale.x, shapeObject.userData.tweenTarget.scale.y, shapeObject.userData.tweenTarget.scale.z); })
         .start();
       characters.add(shapeObject);
     });
+    setTimeout(startAnimationSequence, introDuration);
   }
 
   return {};
